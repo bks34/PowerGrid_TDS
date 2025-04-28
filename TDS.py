@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import os
 
 from algorithm.CG import cg, pcg, is_positive_define
-from algorithm.other_solver import Jacobi, gauss_seidel1, SOR
+from algorithm.other_solver import Jacobi, gauss_seidel, SOR
 from power_system import PowerSystem
 from utils import calculate_G2, calculate_G3, calculate_A, calculate_C, calculate_H, plot_matrix_spectrum
 
@@ -100,6 +100,9 @@ def solve(size, theta:np.ndarray, w:np.ndarray,
     error_newton_pre = 1
     num_of_newton_pre = 5
 
+    # 进行精度控制的最高精度
+    TOL_CG_default = TOL_CG
+
     num_of_newton_total = 0
 
     # pcg2(待修改)
@@ -123,11 +126,11 @@ def solve(size, theta:np.ndarray, w:np.ndarray,
 
         # 设置这一时刻t的初始TOL_CG
         if error_ctrl:
-            TOL_CG = error_newton_pre /100
-            if TOL_CG <= TOL_Newton / 100:
-                TOL_CG = TOL_Newton / 100
-            if num_of_newton_pre <= 2:
-                TOL_CG = TOL_Newton / 100
+            TOL_CG = error_newton_pre / 100
+            if TOL_CG < TOL_CG_default:
+                TOL_CG = TOL_CG_default
+            if num_of_newton_pre <= 3:
+                TOL_CG = TOL_CG_default
 
         # t+1时刻的初值取t时刻的值
         theta_t_1 = theta.copy()
@@ -209,14 +212,14 @@ def solve(size, theta:np.ndarray, w:np.ndarray,
                 if method == 'Jacobi':
                     print("\nJacobi")
                     t_1 = time.perf_counter()
-                    y23 = Jacobi(A=system, b=b, x0=y23, TOL=TOL_CG, N=10*size)
+                    y23 = Jacobi(A=system, b=b, x0=y23, tol=TOL_CG, max_iter=10 * size)
                     t_2 = time.perf_counter()
                     print(f"Jacobi use {t_2 - t_1}s")
 
                 elif method == 'G-S':
                     print("\nG-S")
                     t_1 = time.perf_counter()
-                    y23 = gauss_seidel1(A=system, b=b, x0=y23, tol=TOL_CG, max_iter=10*size)
+                    y23 = gauss_seidel(A=system, b=b, x0=y23, tol=TOL_CG, max_iter=10*size)
                     t_2 = time.perf_counter()
                     print(f"G-S use {t_2 - t_1}s")
 
@@ -284,12 +287,11 @@ def solve(size, theta:np.ndarray, w:np.ndarray,
             if error_ctrl:
                 if num_of_newton == 1:
                     error_newton_pre = error_newton
-                if num_of_newton == 2:
-                    TOL_CG = TOL_Newton / 100
-            if error_ctrl and error_newton < 10*TOL_CG:
-                TOL_CG /= 1000
-                if TOL_CG <= TOL_Newton/100:
-                    TOL_CG = TOL_Newton/100
+               # if num_of_newton == 2:
+                    TOL_CG = TOL_CG_default
+                TOL_CG = error_newton / 100
+                if TOL_CG < TOL_CG_default:
+                    TOL_CG = TOL_CG_default
             if error_newton < TOL_Newton:
                 pre2_ctrl.iter_num_newton = num_of_newton
                 num_of_newton_pre = num_of_newton
@@ -345,45 +347,45 @@ def main():
     #       method="normal", error_ctrl=False)
     # t_normal_2 = time.perf_counter()
 
-    t_Jacobi_1 = time.perf_counter()
-    solve(size=power_system.node_size, theta=power_system.theta, w=power_system.w, E=power_system.E,
-          M=power_system.M, D=power_system.D, T=power_system.T, X=power_system.X,
-          P=power_system.P, Ef=power_system.Ef, B=power_system.B,
-          dt=setting.dt, total_time=setting.total_time, TOL_Newton=setting.TOL_Newton, TOL_CG=setting.TOL_CG,
-          method="Jacobi", error_ctrl=True)
-    t_Jacobi_2 = time.perf_counter()
-
-    t_GS_1 = time.perf_counter()
-    solve(size=power_system.node_size, theta=power_system.theta, w=power_system.w, E=power_system.E,
-          M=power_system.M, D=power_system.D, T=power_system.T, X=power_system.X,
-          P=power_system.P, Ef=power_system.Ef, B=power_system.B,
-          dt=setting.dt, total_time=setting.total_time, TOL_Newton=setting.TOL_Newton, TOL_CG=setting.TOL_CG,
-          method="G-S", error_ctrl=True)
-    t_GS_2 = time.perf_counter()
-
-    t_SOR_1 = time.perf_counter()
-    solve(size=power_system.node_size, theta=power_system.theta, w=power_system.w, E=power_system.E,
-          M=power_system.M, D=power_system.D, T=power_system.T, X=power_system.X,
-          P=power_system.P, Ef=power_system.Ef, B=power_system.B,
-          dt=setting.dt, total_time=setting.total_time, TOL_Newton=setting.TOL_Newton, TOL_CG=setting.TOL_CG,
-          method="SOR", error_ctrl=True)
-    t_SOR_2 = time.perf_counter()
-
-    # t_cg_1 = time.perf_counter()
+    # t_Jacobi_1 = time.perf_counter()
     # solve(size=power_system.node_size, theta=power_system.theta, w=power_system.w, E=power_system.E,
     #       M=power_system.M, D=power_system.D, T=power_system.T, X=power_system.X,
     #       P=power_system.P, Ef=power_system.Ef, B=power_system.B,
     #       dt=setting.dt, total_time=setting.total_time, TOL_Newton=setting.TOL_Newton, TOL_CG=setting.TOL_CG,
-    #       method="cg", error_ctrl=True)
-    # t_cg_2 = time.perf_counter()
+    #       method="Jacobi", error_ctrl=True)
+    # t_Jacobi_2 = time.perf_counter()
     #
-    # t_pcg1_1 = time.perf_counter()
+    # t_GS_1 = time.perf_counter()
     # solve(size=power_system.node_size, theta=power_system.theta, w=power_system.w, E=power_system.E,
     #       M=power_system.M, D=power_system.D, T=power_system.T, X=power_system.X,
     #       P=power_system.P, Ef=power_system.Ef, B=power_system.B,
     #       dt=setting.dt, total_time=setting.total_time, TOL_Newton=setting.TOL_Newton, TOL_CG=setting.TOL_CG,
-    #       method="pcg1", error_ctrl=True)
-    # t_pcg1_2 = time.perf_counter()
+    #       method="G-S", error_ctrl=True)
+    # t_GS_2 = time.perf_counter()
+    #
+    # t_SOR_1 = time.perf_counter()
+    # solve(size=power_system.node_size, theta=power_system.theta, w=power_system.w, E=power_system.E,
+    #       M=power_system.M, D=power_system.D, T=power_system.T, X=power_system.X,
+    #       P=power_system.P, Ef=power_system.Ef, B=power_system.B,
+    #       dt=setting.dt, total_time=setting.total_time, TOL_Newton=setting.TOL_Newton, TOL_CG=setting.TOL_CG,
+    #       method="SOR", error_ctrl=True)
+    # t_SOR_2 = time.perf_counter()
+
+    t_cg_1 = time.perf_counter()
+    solve(size=power_system.node_size, theta=power_system.theta, w=power_system.w, E=power_system.E,
+          M=power_system.M, D=power_system.D, T=power_system.T, X=power_system.X,
+          P=power_system.P, Ef=power_system.Ef, B=power_system.B,
+          dt=setting.dt, total_time=setting.total_time, TOL_Newton=setting.TOL_Newton, TOL_CG=setting.TOL_CG,
+          method="cg", error_ctrl=True)
+    t_cg_2 = time.perf_counter()
+
+    t_pcg1_1 = time.perf_counter()
+    solve(size=power_system.node_size, theta=power_system.theta, w=power_system.w, E=power_system.E,
+          M=power_system.M, D=power_system.D, T=power_system.T, X=power_system.X,
+          P=power_system.P, Ef=power_system.Ef, B=power_system.B,
+          dt=setting.dt, total_time=setting.total_time, TOL_Newton=setting.TOL_Newton, TOL_CG=setting.TOL_CG,
+          method="pcg1", error_ctrl=True)
+    t_pcg1_2 = time.perf_counter()
 
     # t_pcg2_1 = time.perf_counter()
     # solve(size=power_system.node_size, theta=power_system.theta, w=power_system.w, E=power_system.E,
@@ -394,11 +396,11 @@ def main():
     # t_pcg2_2 = time.perf_counter()
 
     # print(f"normal used: {t_normal_2-t_normal_1}")
-    print(f"Jacobi used: {t_Jacobi_2 - t_Jacobi_1}")
-    print(f"G-S used: {t_GS_2 - t_GS_1}")
-    print(f"SOR used: {t_SOR_2 - t_SOR_1}")
-    # print(f"cg used: {t_cg_2-t_cg_1}")
-    # print(f"pcg1 used: {t_pcg1_2-t_pcg1_1}")
+    # print(f"Jacobi used: {t_Jacobi_2 - t_Jacobi_1}")
+    # print(f"G-S used: {t_GS_2 - t_GS_1}")
+    # print(f"SOR used: {t_SOR_2 - t_SOR_1}")
+    print(f"cg used: {t_cg_2-t_cg_1}")
+    print(f"pcg1 used: {t_pcg1_2-t_pcg1_1}")
     # print(f"pcg2 used: {t_pcg2_2-t_pcg2_1}")
 
 if __name__ == '__main__':

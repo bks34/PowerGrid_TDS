@@ -1,0 +1,4 @@
+*.txt
+results/
+.idea/
+test.py
